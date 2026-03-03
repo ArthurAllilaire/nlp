@@ -1,18 +1,19 @@
 # PCL EDA Findings
 
 **Dataset:** Don't Patronize Me! (DPM) — SemEval-2022 Task 4, Subtask 1
+
 **Task:** Binary classification of Patronizing and Condescending Language (PCL vs No-PCL)
+
 **Dataset size:** 10,469 paragraphs from English-language news, sourced from the NOW corpus
+
 **Notebook:** `eda_pcl.ipynb` | **Figures:** `figures/`
 
 ---
 
 ## Dataset Overview
 
-Each paragraph was retrieved by searching news articles for mentions of ten vulnerable-community
-keywords (disabled, homeless, hopeless, immigrant, in-need, migrant, poor-families, refugee,
-vulnerable, women). Two annotators independently rated each paragraph on a 0–4 scale; for
-Task 1, labels 0–1 are collapsed to **No-PCL (0)** and labels 2–4 to **PCL (1)**.
+Each paragraph was retrieved by searching news articles for mentions of ten vulnerable-community keywords (disabled, homeless, hopeless, immigrant, in-need, migrant, poor-families, refugee,
+vulnerable, women). Two annotators independently rated each paragraph on a 0–4 scale; for Task 1, labels 0–1 are collapsed to **No-PCL (0)** and labels 2–4 to **PCL (1)**. In practice, the official test dataset does not have any examples of PCL label = 2, as this is an uncertain classification.
 
 ---
 
@@ -37,21 +38,16 @@ Fine-grained breakdown (original 0–4 scale):
 | 4 | Both annotators: Strong PCL | 391 | 3.7 % |
 
 ### Analysis
-The dataset is **severely imbalanced** at a 9.54:1 ratio (No-PCL to PCL). Crucially, the
-fine-grained distribution reveals that the majority of PCL examples sit at labels 3 and 4
-(strong / clear-cut PCL), with very few borderline cases at label 2. The binary collapse means
-the PCL class is dominated by unambiguous examples, which is advantageous for learning a
-clean decision boundary — but the sheer scarcity of the positive class remains the central
-modelling challenge.
+The dataset is **severely imbalanced** at a 9.54:1 ratio (No-PCL to PCL), with only 993 PCL examples this will be the central modelling challenge. 993 examples is also a very small dataset so will have to be wary of overfitting during training and make advantage of pre-trained models for extra context and initial training vals.
+
+However, the fine-grained distribution reveals that the majority of PCL examples sit at labels 3 and 4 (strong / clear-cut PCL), with very few borderline cases at label 2 (only 1.4%). This means the binary collapse into the PCL class is dominated by unambiguous examples, which is advantageous for learning a clean decision boundary.
 
 ### Impact Statement
-A naïve majority-class classifier would achieve ~90.5% accuracy while predicting No-PCL for
-every sample, making accuracy a misleading metric. **F1-score on the positive class** must be
-the primary evaluation metric. Class imbalance mandates one or more mitigation strategies:
-weighted cross-entropy loss (weight ≈ 9.5 for the PCL class), oversampling PCL examples (e.g.
-SMOTE on embeddings, or simply up-sampling), or threshold tuning at inference time. The scarcity
-of label-2 examples (borderline, low-agreement) also suggests that uncertainty-aware methods may
-be beneficial.
+A naive majority-class classifier would achieve ~90.5% accuracy while predicting No-PCL for every sample, making accuracy a misleading metric. **F1-score on the positive class** must be
+the primary evaluation metric. Class imbalance mandates one or more mitigation strategies: 
+- Weighted cross-entropy loss (weight ≈ 9.5 for the PCL class)
+- Oversampling PCL examples (e.g. up-sampling)
+- Threshold tuning at inference time
 
 ---
 
@@ -74,19 +70,12 @@ be beneficial.
 | 99th | 141 |
 
 ### Analysis
-Both classes exhibit a **right-skewed distribution**, with most paragraphs between 20–100
-words. PCL texts are marginally but consistently longer (mean 53.6 vs 47.9 words), suggesting
-that patronising passages tend to be more elaborate — possibly because the author spends more
-words contextualising or "justifying" the condescension. The long tail extends to 909 words for
-No-PCL texts (likely full article quotes), while PCL texts top out at 512. The vast majority of
+Both classes exhibit a similar **right-skewed distribution**, with most paragraphs between 20–100 words. PCL texts are marginally but consistently longer (mean 53.6 vs 47.9 words), suggesting that patronising passages tend to be more elaborate. This is consistent with the "flowery language" and metaphors present in PCL. The long tail extends to 909 words for No-PCL texts (likely full article quotes), while PCL texts top out at 512. The vast majority of
 all texts (95%) fit within 102 words.
 
 ### Impact Statement
-Setting `max_length = 128` tokens for a transformer model (e.g. BERT, RoBERTa) will capture
-≥95% of the text without truncation, balancing coverage with computational cost. The few
-extreme-length outliers (>200 words) should be inspected for data-collection artefacts; they
-may warrant truncation or removal. The slight length difference between classes is unlikely to
-be a useful standalone feature but may be included as auxiliary input.
+Setting `max_length = 128` tokens for a transformer model (e.g. BERT, RoBERTa) will capture ≥95% of the text without truncation, balancing coverage with computational cost. The few
+extreme-length outliers (>200 words) should be inspected and possibly truncated or removed. The slight length difference between classes is unlikely to be a useful standalone feature.
 
 ---
 
@@ -94,6 +83,7 @@ be a useful standalone feature but may be included as auxiliary input.
 
 ### Visual Evidence
 ![Keyword Distribution](figures/fig3_keyword_distribution.png)
+![Keyword Distribution](figures/fig1b_keyword_sample_count.png)
 
 | Keyword | No-PCL | PCL | Total | PCL Rate |
 |---------|-------:|----:|------:|---------:|
@@ -109,22 +99,55 @@ be a useful standalone feature but may be included as auxiliary input.
 | immigrant | 1,031 | 30 | 1,061 | **2.8%** |
 
 ### Analysis
-PCL rates vary dramatically across keywords — from **16.5%** (homeless, poor-families) down to
-**2.8%** (immigrant). Communities associated with economic deprivation (homeless, poor-families,
-in-need) attract substantially more patronising language than politically-framed groups
-(immigrant, migrant). This likely reflects the nature of charity/aid journalism: articles about
-economic poverty tend to adopt a "helpful saviour" tone, whereas immigration articles tend toward
-political debate. Notably, the sample sizes are roughly balanced across keywords (~1,000–1,090
-each), so the PCL rate differences are genuine and not artefacts of sampling.
+PCL rates deviate significantly from the dataset baseline of **9.5%**. Keywords linked to
+economic deprivation show the largest positive deviations: homeless (+7.0pp), poor-families
+(+7.0pp), in-need (+6.8pp). Politically-framed keywords show the largest negative deviations:
+immigrant (−6.7pp), migrant (−6.2pp). Because all keyword groups are roughly equally sized
+(~1,000 each), these deviations are not sampling artefacts — they reflect genuine differences
+in how each community is written about.
+
+The keyword share plot confirms this: homeless and in-need are substantially over-represented
+among PCL texts relative to their share of No-PCL texts (~18% of all PCL vs ~9–10% of all
+No-PCL), while immigrant and migrant are under-represented (~3% of PCL vs ~11% of No-PCL).
+This likely reflects the nature of source journalism — charity and aid reporting about economic
+poverty tends to adopt a paternalistic "helpful saviour" register, whereas immigration coverage
+skews toward political debate.
 
 ### Impact Statement
-The keyword a paragraph comes from is a **meaningful proxy for prior PCL probability** and
-should be considered as an auxiliary feature (keyword embedding or one-hot indicator). Models
-trained without this signal may underfit on low-rate keywords (immigrant, migrant) and
-overfit on high-rate ones (homeless, poor-families). If the test set has a different keyword
-distribution than training, performance may degrade — this motivates keyword-stratified
-cross-validation during development. The data also hints that a keyword-conditioned threshold
-could improve final F1.
+The keyword is a **weak but non-trivial prior** for PCL probability — not a causal signal.
+A model relying on keyword alone would exploit dataset collection bias rather than genuine
+linguistic patterns, so it should be treated as an auxiliary feature (one-hot or learned
+embedding) rather than a primary one. The variation also motivates **keyword-stratified
+cross-validation**: since some keywords are over-represented in the PCL class, random splits
+risk inflating dev-set performance. A keyword-conditioned decision threshold could offer
+marginal gains at inference time.
+
+---
+
+## EDA 3b - Confirming vocabulary divergence (Using Word Clouds + TF-IDF Scores)
+
+### Visual Evidence
+![TF-IDF Results](figures/fig6b_tfidf_bars.png)
+![Word Clouds](figures/fig6_wordclouds.png)
+*(TF-IDF weighted — larger words are more distinctive to that class, not merely more frequent)*
+
+### Analysis
+The TF-IDF weighting surfaces **characteristic vocabulary** rather than ubiquitous words.
+The **PCL word cloud** is dominated by emotive community-focused language: *people*, *help*,
+*poor*, *community*, *need*, *women*, *children*, *families*, *life* — words that enact a
+compassionate, paternalistic register. The **No-PCL cloud** shows a markedly different
+character: factual and institutional language (*government*, *percent*, *country*, *policy*,
+*law*, *work*, *country*, *report*) alongside geographic referents, consistent with
+straightforward news reporting. The contrast visually confirms the n-gram findings: PCL is
+associated with "caring" relational language, while No-PCL is associated with analytical
+reportage.
+
+### Impact Statement
+The vocabulary divergence is strong enough that even simple **bag-of-words features** should
+show non-trivial performance. Indeed - the SVM-BoW baseline (TF-IDF weighted Bag-of-Words) signficantly outperforms the random baseline in their benchmarking. (F1 = 40.59 vs. 33.31 for Random).
+
+However, the many shared words (community labels, general news vocabulary) mean that a model relying solely on individual word presence will conflate benign reporting about vulnerable groups with genuinely patronising content. This motivates the use
+of **contextual embeddings** (e.g. RoBERTa) that encode how words are used together, not just which words appear.
 
 ---
 
@@ -209,34 +232,6 @@ per-category F1 rather than macro-averaged accuracy. The positive correlation be
 Unbalanced power and Shallow solution also suggests that predicting one increases the
 probability of the other — a multi-label model that captures label correlations (e.g. via
 label-dependency chains) may outperform independent binary classifiers per category.
-
----
-
-## EDA 6 — Word Cloud Visualisation
-
-### Visual Evidence
-![Word Clouds](figures/fig6_wordclouds.png)
-
-*(TF-IDF weighted — larger words are more distinctive to that class, not merely more frequent)*
-
-### Analysis
-The TF-IDF weighting surfaces **characteristic vocabulary** rather than ubiquitous words.
-The **PCL word cloud** is dominated by emotive community-focused language: *people*, *help*,
-*poor*, *community*, *need*, *women*, *children*, *families*, *life* — words that enact a
-compassionate, paternalistic register. The **No-PCL cloud** shows a markedly different
-character: factual and institutional language (*government*, *percent*, *country*, *policy*,
-*law*, *work*, *country*, *report*) alongside geographic referents, consistent with
-straightforward news reporting. The contrast visually confirms the n-gram findings: PCL is
-associated with "caring" relational language, while No-PCL is associated with analytical
-reportage.
-
-### Impact Statement
-The vocabulary divergence is strong enough that even simple **bag-of-words features** should
-show non-trivial performance. However, the many shared words (community labels, general news
-vocabulary) mean that a model relying solely on individual word presence will conflate benign
-reporting about vulnerable groups with genuinely patronising content. This motivates the use
-of **contextual embeddings** (e.g. RoBERTa) that encode how words are used together, not just
-which words appear.
 
 ---
 
